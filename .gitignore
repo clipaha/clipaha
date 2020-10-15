@@ -1,0 +1,14 @@
+/bin
+/compile.sh.old
+/benchmark/bin
+/example/bin
+/native
+/other
+/src/prejs
+/sodium
+/benchmark/sodium.js
+/clipaha.tar.xz
+/example/server.py
+/benchmark/download.php
+/benchmark/save.php
+/benchmark/db.sql

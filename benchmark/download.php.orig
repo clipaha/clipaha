@@ -1,0 +1,62 @@
+<?php
+
+$link = false;
+$trans = false;
+$result = false;
+
+function errordie() {
+  global $link, $trans, $result;
+  if ($result)
+    $result->free();
+  $result = false;
+  if ($link && $trans)
+    $link->rollback();
+  $trans = false;
+  if ($link)
+    $link->close();
+  $link = false;
+  http_response_code(500);
+  die('');
+}
+function exception_error_handler($errno, $errstr, $errfile, $errline ) {
+  errordie();
+}
+set_error_handler("exception_error_handler");
+
+if ($_GET["key"] !== "access_key") {
+  http_response_code(403);
+  die('');
+}
+
+$link = new mysqli('localhost', 'clipaha_benchmark_get', 'password','clipaha_benchmark');
+if ($link->connect_errno)
+  errordie();
+
+if (!$link->begin_transaction(MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT|MYSQLI_TRANS_START_READ_ONLY))
+  errordie();
+$trans = true;
+
+$result = $link->query("SELECT * FROM data");
+
+if (!$result)
+  errordie();
+
+http_response_code(200);
+header('Content-Type: application/json');
+
+echo "[";
+$start = true;
+while ($row=$result->fetch_array(MYSQLI_NUM)) {
+  if ($start)
+    $start = false;
+  else
+    echo ",";
+  echo $row[0];
+}
+echo "]";
+
+$link->commit();
+$trans = false;
+
+$link->close();
+$link = false;

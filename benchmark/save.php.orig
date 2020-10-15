@@ -1,0 +1,59 @@
+<?php
+
+$link = false;
+$trans = false;
+$stmt = false;
+
+function errordie() {
+  global $link, $trans, $stmt;
+  if ($stmt)
+    $stmt->close();
+  $stmt = false;
+  if ($link && $trans)
+    $link->rollback();
+  $trans = false;
+  if ($link)
+    $link->close();
+  $link = false;
+  http_response_code(500);
+  die('');
+}
+function exception_error_handler($errno, $errstr, $errfile, $errline ) {
+  errordie();
+}
+set_error_handler("exception_error_handler");
+$data = $_POST["data"];
+if (!$data)
+  errordie();
+
+$link = new mysqli('localhost', 'clipaha_benchmark', 'password','clipaha_benchmark');
+if ($link->connect_errno)
+  errordie();
+
+if (!$link->begin_transaction(MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT|MYSQLI_TRANS_START_READ_WRITE))
+  errordie();
+$trans = true;
+
+$stmt = $link->prepare("INSERT INTO data VALUES(?)");
+if(!$stmt)
+  errordie();
+
+if(!$stmt->bind_param('s',$data))
+  errordie();
+
+if(!$stmt->execute())
+  errordie();
+
+if ($stmt->affected_rows != 1)
+  errordie();
+
+$stmt->close();
+$stmt = false;
+
+if (!$link->commit())
+  errordie();
+$trans = false;
+http_response_code(200);
+
+$link->close();
+$link = false;

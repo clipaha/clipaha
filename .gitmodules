@@ -1,0 +1,8 @@
+[submodule "phc-winner-argon2"]
+	path = phc-winner-argon2
+	url = https://github.com/P-H-C/phc-winner-argon2.git
+	shallow = true
+[submodule "libsodium.js"]
+	path = libsodium.js
+	url = https://github.com/jedisct1/libsodium.js.git
+	shallow = true

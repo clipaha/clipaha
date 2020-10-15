@@ -1,0 +1,220 @@
+import sys
+import os
+import binascii
+import hashlib
+
+__is_micropython = sys.implementation.name == 'micropython'
+
+if __is_micropython:
+  import network
+  sta_if = network.WLAN(network.STA_IF)
+  sta_if.active(True)
+  sta_if.connect("mywifi", "mypassword")
+  import usocket as socket
+  print("Connecting to the wifi...")
+  while not sta_if.isconnected():
+    pass
+  print("Done...")
+else:
+  import socket
+  import traceback
+  
+UTF8HTML=b'text/html; charset=utf-8'
+JS=b'application/javascript'
+OS=b'application/octet-stream'
+WASM=b'application/wasm'
+
+DATA = {
+  b'/': ('www/login.html', UTF8HTML),
+  b'/login.html': ('www/login.html', UTF8HTML),
+  b'/register.html': ('www/register.html', UTF8HTML),
+  b'/gencreds.js': ('www/gencreds.js', JS),
+  b'/worker.js': ('www/worker.js', JS),
+  b'/a.js': ('www/a.js', JS),
+  b'/a.js.mem': ('www/a.js.mem', OS),
+  b'/awasm.js': ('www/awasm.js', JS),
+  b'/awasm.wasm': ('www/awasm.wasm', WASM),
+  b'/aworker.js': ('www/aworker.js', JS),
+  b'/aworker.js.mem': ('www/aworker.js.mem', OS),
+  b'/awasmworker.js': ('www/awasmworker.js', JS),
+  b'/awasmworker.wasm': ('www/awasmworker.wasm', WASM),
+}
+
+def do_text(client_stream, code, message,text):
+  client_stream.write(b'HTTP/1.0 %d %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n' % (code, message))
+  client_stream.write(text)
+
+def do_404(client_stream):
+  do_text(client_stream, 404, b'Not Found', b'Page not found!')
+  raise Exception()
+
+def do_400(client_stream):
+  do_text(client_stream, 400, b'Bad Request', b'Bad Request')
+  raise Exception()
+
+def do_403(client_stream):
+  do_text(client_stream, 403, b'Forbidden', b'Action is not permited. Invalid credentials or user already registered.')
+  raise Exception()
+
+def get_content(client_stream, path):
+  if path not in DATA:
+    do_404(client_stream)
+  else:
+    client_stream.write(b'HTTP/1.0 200 OK\r\nContent-Type: %s\r\n\r\n'%(DATA[path][1],))
+    with open(DATA[path][0],"rb") as f:
+      while True:
+        data = f.read(1024)
+        if not data:
+          break
+        client_stream.write(data)
+
+def url_decode(data):
+  bits = data.replace(b'+',b' ').split(b'%')
+  rv = [bits[0]]
+  htbc = {}
+  for bit in bits[1:]:
+    code = bit[:2]
+    if code not in htbc:
+      htbc[code] = bytes([int(code, 16)])
+    rv.append(htbc[code])
+    rv.append(bit[2:])
+  htbc = None
+  return b''.join(rv)
+
+def validate_username(user):
+  return b'\x00' not in user and b'/' not in user and b'\\' not in user
+
+def process_request(client_stream, path, cnt):
+  epwd = None
+  login = b''
+  name = b''
+  pwd = b''
+  for elem in cnt.split(b'&'):
+    es = elem.split(b'=')
+    vn = url_decode(es[0])
+    vv = url_decode(b'='.join(es[1:]))
+    es = None
+    if vn == b'encrypted-password':
+      if len(vv) != 64:
+        do_400(client_stream)
+      try:
+        epwd = binascii.unhexlify(vv)
+      except Exception:
+        do_400(client_stream)
+    elif vn == b'login':
+      login = vv
+      if not validate_username(login):
+        do_403(client_stream)
+    elif vn == b'name':
+      name = vv
+    elif vn == b'password':
+      pwd = vn
+    vn = None
+    vv = None
+  if path == b'/' or path == b'/login.html':
+    try:
+      f = open('users/%s'%(login.decode('utf-8'),),'rb')
+    except OSError:
+      do_403(client_stream)      
+    with f:
+      salt = f.read(32)
+      if hashlib.sha256(salt+epwd).digest() != f.read(32):
+        do_403(client_stream)
+      name = f.read()
+    do_text(client_stream, 200, b'OK', b'Hello %s'%(name,))
+  elif path == b'/register.html':
+    with open('users/%s'%(login.decode('utf-8'),),'a+b') as f:
+      if f.tell() != 0:
+        do_403(client_stream)
+      salt = os.urandom(32)
+      f.write(salt)
+      f.write(hashlib.sha256(salt+epwd).digest())
+      f.write(name)
+    do_text(client_stream, 200, b'OK', b'User registered')
+  else:
+    do_404(client_stream)
+
+def main():
+  s = socket.socket()
+
+  # Binding to all interfaces - server will be accessible to other hosts!
+  ai = socket.getaddrinfo("0.0.0.0", 8080)
+  print("Bind address info:", ai)
+  addr = ai[0][-1]
+
+  s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  s.bind(addr)
+  s.listen(16)
+  print("Listening, connect your browser to http://%s:8080/" %(sta_if.ifconfig()[0]))
+
+  while True:
+    res = s.accept()
+    client_sock = res[0]
+    client_addr = res[1]
+    try:      
+      print("Client address:", client_addr)
+      print("Client socket:", client_sock)
+      client_sock.settimeout(2.0)
+
+      if __is_micropython:
+        client_stream = client_sock.makefile("rwb")
+      else:
+        client_stream = client_sock
+        
+      try:
+        print("Request:")
+        req = client_stream.readline(1024)
+        print(req)
+        if not req.endswith(b"\r\n") or req.count(b" ") != 2:
+          do_400(client_stream)
+        cl = 0
+        cnt = b''
+        while True:
+          h = client_stream.readline(1024)
+          if h == b"\r\n":
+            break
+          cpos=h.find(b": ")
+          if not h.endswith(b"\r\n") or cpos < 1:
+            do_400(client_stream)
+          hn = h[0:cpos]
+          hv = h[cpos+2:-2]
+          if hn.lower() == b'content-length':
+            cl = int(hv)
+          print(h)
+          h = None
+          hn = None
+          hv = None
+        if cl >= 1024:
+          do_400(client_stream)
+        if cl > 0:
+          cnt = client_stream.read(cl)
+        print()
+        print(cnt)
+        path=req.split(b" ")[1]
+        qpos=path.find(b"?")
+        if qpos >= 0:
+          path=path[0:qpos]
+          query=path[qpos+1:]
+        else:
+          query=''
+        if req.startswith(b"GET "):
+          get_content(client_stream, path)
+        elif req.startswith(b"POST "):
+          process_request(client_stream, path, cnt)
+        else:
+          do_400(client_stream)
+        print()
+      finally:
+        if not __is_micropython:
+          client_stream.close()
+    except Exception as e:
+      if __is_micropython:
+        sys.print_exception(e)
+      else:
+        traceback.print_exc()
+      pass
+    finally:
+      client_sock.close()
+      
+
+main()

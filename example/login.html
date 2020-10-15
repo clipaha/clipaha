@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Example login</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <script src="bin/ultra/clipaha.js"></script>
+    <script src="gencreds.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Example login form</h1>
+      <form id="form" method="post" enctype="application/x-www-form-urlencoded">
+        <input type="hidden" name="encrypted-password" id="encrypted-password">
+        <div class="form-group">
+          <label for="login">Login:</label>
+          <input type="text" name="login" class="form-control" placeholder="Enter login" id="login">
+        </div>
+        <div class="form-group">
+          <label for="password">Login:</label>
+          <input type="password" name="password" class="form-control" placeholder="Enter password" id="password">
+        </div>
+        <button class="btn btn-primary" type="button" onclick="genCreds()" id="submitbtn">Login</button>
+      </form>
+    </div>
+  </body>
+</html>

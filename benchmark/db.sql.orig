@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS `clipaha_benchmark` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+USE `clipaha_benchmark`;
+
+CREATE TABLE `data` (
+  `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`data`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE USER IF NOT EXISTS 'clipaha_benchmark'@'localhost' IDENTIFIED BY 'password';
+GRANT USAGE ON *.* TO 'clipaha_benchmark'@'localhost';
+GRANT INSERT ON `clipaha_benchmark`.`data` TO 'clipaha_benchmark'@'localhost';
+
+CREATE USER IF NOT EXISTS 'clipaha_benchmark_get'@'localhost' IDENTIFIED BY 'password';
+GRANT USAGE ON *.* TO 'clipaha_benchmark_get'@'localhost';
+GRANT SELECT ON `clipaha_benchmark`.`data` TO 'clipaha_benchmark_get'@'localhost';

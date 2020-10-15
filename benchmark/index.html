@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Clipaha Benchmark!</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <script>
+var bbut, sbut, st, dat, cbe, cmt, cmtg, state, dojs, sodiumworker;
+var bms = [
+  {uname:"user1",domain:"example.com",passwd:"test1"},
+  {uname:"user2",domain:"example.com",passwd:"test2"},
+  {uname:"user3",domain:"example.com",passwd:"test3"},
+  {uname:"user4",domain:"example.com",passwd:"test4"},
+  {uname:"user5",domain:"example.com",passwd:"test5"},
+];
+var ClipAha_avoidworker=false;
+var ClipAha_avoidwasm=false;
+
+function goto(st,ty,sec,bm) {
+  window.sessionStorage.setItem('cabmstate',JSON.stringify(state));
+  window.location.hash = '#'+[st,ty,sec,bm].join(',');
+  window.location.reload(true); //bypass cache
+}
+
+function goto_run(ty,sec,bm) {
+  report_status("Waiting 10 seconds for the system to recover");
+  setTimeout(function() {goto("run",ty,sec,bm);}, 10000);
+}
+
+function goto_next(st,ty,sec,bm) {
+  if(st == "run")
+    goto("wait",ty,sec,bm);
+  else if(bm < bms.length)
+    goto_run(ty,sec,(bm|0)+1);
+  else if (sec == "low")
+    goto_run(ty,"med","1");
+  else if (sec == "med")
+    goto_run(ty,"high","1");
+  else if (sec == "high")
+    goto_run(ty,"ultra","1");
+  else if (sec == "ultra" && ty == "ca")
+    goto_run("ls","low","1");
+  else if (sec == "ultra" && ty == "ls")
+    if (state.js)
+      goto_run("nw","low","1");
+    else
+      goto("done","","","");
+  else if (sec == "ultra" && ty == "nw")
+    goto("done","","","");
+}
+
+function report_status(data) {
+  state.status.push(data);
+  st.textContent = state.status.join('\n');
+}
+
+function report_benchmark(typ,sec,num,data) {
+  if (!state.benchdata[typ])
+    state.benchdata[typ] = {}
+  if (!state.benchdata[typ][sec])
+    state.benchdata[typ][sec] = []
+  state.benchdata[typ][sec][(num|0)-1]=data;
+  if (data.status === "ok")
+    state.bmstatus.push("type: "+typ+" security level: "+sec+" benchmark: "+num+" status: ok time: "+data.time+" result: "+data.res);
+  else
+    state.bmstatus.push("type: "+typ+" security level: "+sec+" benchmark: "+num+" status: failed");
+  dat.textContent = state.bmstatus.join('\n');
+}
+
+function benchmark_allow(){
+  var security = window.location.hash.substring(1);
+  cmt = document.getElementById("comment");
+  cmtg = document.getElementById("cmtg");
+  bbut = document.getElementById("benchbtn");
+  sbut = document.getElementById("submitbtn");
+  st = document.getElementById("status");
+  dat = document.getElementById("data");
+  if (!security || security == "js") {
+    state={status:[],bmstatus:[],benchdata:{}};
+    if (!security)
+      state.js=false;
+    else
+      state.js=true;
+    state.benchdata.ua = navigator.userAgent;
+    state.benchdata.workers = !!window.Worker;
+    state.benchdata.wasm = typeof WebAssembly === "object";
+    bbut.onclick=function() {
+      report_status("Running benchmarks, webbrowser may appear to hang!");
+      goto("run","ca","low","1");
+    }
+    bbut.disabled=false;
+    window.sessionStorage.setItem('cabmstate',JSON.stringify(state));
+    report_status("Ready!");
+  } else {
+    state = JSON.parse(window.sessionStorage.getItem('cabmstate'));
+    st.textContent = state.status.join('\n');
+    dat.textContent = state.bmstatus.join('\n');
+    var data = security.split(",");
+    if(data[0] == "done") {
+      report_status("Benchmarks done, please submit if you want along with a short hardware description.");
+      cmt.disabled = false;
+      cmtg.style="";
+      sbut.onclick=submit_benchmark;
+      sbut.disabled=false;
+    } else if(data[0] == "wait") {
+      goto_next(data[0],data[1],data[2],data[3]);
+    } else if(data[1] == "ca") {
+      run_clipaha_benchmark_wa(data[2],data[3],true);
+    } else if(data[1] == "nw") {
+      run_clipaha_benchmark_js(data[2],data[3],false);
+    } else if(data[1] == "ls") {
+      run_libsodium_benchmark(data[2],data[3]);
+    }
+  }   
+}
+
+
+function run_clipaha_benchmark_wa(security,num){
+  ClipAha_avoidwasm = false;
+  var bname = "clipaha wa "+security+" "+num;
+  var bdata = bms[(num|0)-1];
+  report_status(bname+" Loading code");
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.onload = function() {
+    var hp = window["clipaha_"+security+"_hash"];
+    var d = bdata.domain; //This can be expanded to add things like port and so
+    var i = bdata.uname;
+    var p = bdata.passwd;
+    var t0,t1;
+    var rb = function(bres) {
+        report_status(bname+": "+JSON.stringify(bres));
+        report_benchmark("clipahawa",security,num+'',bres);
+        goto_next("wait","ca",security,num);
+    }
+    var done = function(epassword) {
+      t1=performance.now();
+        rb({status:"ok",time:t1-t0,res:epassword});
+    }
+    var error = function(e) {
+        rb({status:"failed"});
+    }
+    report_status(bname+" Starting bm");
+    try {
+      t0=performance.now();
+      hp(d,i,p,done,error);
+    } catch(e) {
+       error(e);
+    }
+  };
+  script.src="bin/"+security+"/clipaha.js";
+  document.head.appendChild(script);
+}
+
+
+function run_clipaha_benchmark_js(security,num){
+  ClipAha_avoidwasm = true;
+  var bname = "clipaha js "+security+" "+num;
+  var bdata = bms[(num|0)-1];
+  report_status(bname+" Loading code");
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.onload = function() {
+    var hp = window["clipaha_"+security+"_hash"];
+    var d = bdata.domain; //This can be expanded to add things like port and so
+    var i = bdata.uname;
+    var p = bdata.passwd;
+    var t0,t1;
+    var rb = function(bres) {
+        report_status(bname+": "+JSON.stringify(bres));
+        report_benchmark("clipahajs",security,num+'',bres);
+        goto_next("wait","nw",security,num);
+    }
+    var done = function(epassword) {
+      t1=performance.now();
+        rb({status:"ok",time:t1-t0,res:epassword});
+    }
+    var error = function(e) {
+        rb({status:"failed"});
+    }
+    report_status(bname+" Starting bm");
+    try {
+      t0=performance.now();
+      hp(d,i,p,done,error);
+    } catch(e) {
+       error(e);
+    }
+  };
+  script.src="bin/"+security+"/clipaha.js";
+  document.head.appendChild(script);
+}
+
+function run_libsodium_benchmark(security,num) {
+  var bname = "sodium "+security+" "+num;
+  var bdata = bms[(num|0)-1];
+  report_status(bname+" Loading code");
+  var t0,t1;
+  var rb = function(bres) {
+      report_status(bname+": "+JSON.stringify(bres));
+      report_benchmark("sodium",security,num+'',bres);
+      goto_next("wait","ls",security,num);
+      if (sodiumworker.terminate)
+        sodiumworker.terminate();
+      sodiumworker = undefined;
+  }
+  sodiumworker = new Worker("./sodiumworker.js");
+  sodiumworker.onmessage = function(e) {
+    if(e.data.status == "ready") {
+      report_status(bname+" Starting bm");
+      t0=performance.now();
+      sodiumworker.postMessage({security:security,bdata:bdata});
+    } else if (e.data.status == "ok") {
+      t1=performance.now();
+      rb({status:"ok",time:t1-t0,res:e.data.epasswd});
+    } else {
+      console.log(e.data.status);
+      rb({status:"failed"});
+    }
+  }
+}
+
+function submit_benchmark(){
+  sbut.onclick=null;
+  sbut.disabled=true;
+  cmt.disabled=true;
+  report_status("Preparing data for submission.");
+  state.benchdata.comment = cmt.value;
+  var jdata=JSON.stringify(state.benchdata);
+  report_status("Will submit: "+jdata);
+  var formData = new FormData();
+  formData.append("data", jdata);
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", "save.php",true);
+  xhr.send(formData);
+  xhr.onreadystatechange = function (aEvt) {
+    if (xhr.readyState == 4) {
+      if (xhr.status == 200)
+        report_status("Benchmark data submitted, thanks for your contribution.");
+      else {
+        report_status("Benchmark data submission failed, try again or send manually to the author.");
+        sbut.onclick=submit_benchmark;
+        sbut.disabled=false;
+      }
+    }
+  };
+}
+
+</script>
+  </head>
+  <body onload="benchmark_allow()">
+    <div class="container">
+      <h1>Clipaha Benchmark</h1>
+      <div class="form-group"  style="display:none" id="cmtg">
+      <label for="comment">Additional hardware information (please write here):</label>
+      <textarea class="form-control" rows="5" id="comment" placeholder="Please enter here your CPU model, RAM amount, OS and OS version and browser and browser verion you used along other details that may be relevant (for example laptop or phone model)." disabled></textarea>
+      </div>
+      <button class="btn btn-primary" type="button" id="benchbtn" disabled>Benchmark</button>
+      <button class="btn btn-primary" type="button" id="submitbtn" disabled>Submit</button>
+      <h2>Status</h2>
+      <pre id="status"></pre>
+      <h2>Benchmark Data</h2>
+      <pre id="data"></pre>
+    </div>
+  </body>
+</html>
