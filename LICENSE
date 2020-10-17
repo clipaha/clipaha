@@ -1,7 +1,7 @@
-Argon2 reference source code package - reference C implementations
+Clipaha a JavaScript library to make Client-side Password Hashing Easy
 
-Copyright 2015
-Daniel Dinu, Dmitry Khovratovich, Jean-Philippe Aumasson, and Samuel Neves
+Copyright © 2018-2020 Francisco Blas Izquierdo Riera (klondike)
+
 
 You may use this work under the terms of a Creative Commons CC0 1.0 
 License/Waiver or the Apache Public License 2.0, at your option. The terms of
@@ -9,6 +9,43 @@ these licenses can be found at:
 
 - CC0 1.0 Universal : https://creativecommons.org/publicdomain/zero/1.0
 - Apache 2.0        : https://www.apache.org/licenses/LICENSE-2.0
+
+
+The code makes use of: Argon2 reference source code package
+
+Copyright 2015
+Daniel Dinu, Dmitry Khovratovich, Jean-Philippe Aumasson, and Samuel Neves
+
+Argon2 is licensed under the terms of a Creative Commons CC0 1.0
+License/Waiver or the Apache Public License 2.0, at your option. The terms of
+these licenses can be found at:
+
+- CC0 1.0 Universal : https://creativecommons.org/publicdomain/zero/1.0
+- Apache 2.0        : https://www.apache.org/licenses/LICENSE-2.0
+
+
+The benchmark also includes for the purpose of testing: libsodium.js
+
+Copyright (c) 2015-2020
+Ahmad Ben Mrad <batikhsouri at gmail dot org>
+Frank Denis <j at pureftpd dot org>
+Ryan Lester <ryan at cyph dot com>
+
+libsodium.js has the following license:
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+Daniel Dinu, Dmitry Khovratovich, Jean-Philippe Aumasson, and Samuel Neves
+
 
 The terms of the licenses are reproduced below.
 
