@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EMSDK_PATH=../../../emscripten/emsdk/
+EMSDK_PATH=${EMSDK_PATH:-../../../emscripten/emsdk/}
 
 rm -rf bin native src/prejs
 mkdir src/prejs &&
